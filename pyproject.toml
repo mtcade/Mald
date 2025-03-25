@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Mald"
+version = "0.0.1"
+authors = [
+  { name="Evan Mason" }
+]
+description = "Mean Absolute Local Derivative Importance for nonlinear heterogeneous knockoffs"
+keywords = ["knockoffs","nonparametric","heterogeneous"]
+dependences = [
+    "numpy < 2.0.0",
+    "pandas",
+    "tensorflow >= 2.0.0"
+]
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
