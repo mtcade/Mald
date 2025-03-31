@@ -1,5 +1,5 @@
 """
-    Interface to use localgradimportance.Importance without a model in hand; creates a SuperBasicNetwork
+    One step interface to use ``maldImportance.importance`` without a model in hand by using ``maldImportance.superBasicNetworks.SimpleNN``.
 """
 
 import numpy as np
@@ -28,7 +28,26 @@ def importances(
     verbose: int = 0
     ) -> np.ndarray:
     """
-        Creates a SuperBasicNetwork and uses it for local grad importance
+        :param np.ndarray|pd.DataFrame X: Explanatory data
+        :param np.ndarray|pd.DataFrame Xk: Knockoff explanatory data
+        :param np.ndarray|pd.Series y: Outcome data
+        :param Literal['auto_diff','bandwidth'] local_grad_method: Method of MALD. Defaults to `'auto_diff'` for exact autodifferentiation. `'bandwidth'` uses the bandwidth approximation when auto differentiation is not available.
+        :param float|None bandwidth: Width if `local_grad_method = 'bandwidth'`
+        :param float exponent: Power to take of each MALD value. 1.0 and 2.0 both work reasonably well.
+        :param bool drop_first: How to handle one-hot-encoding categorical variables. If `True` the number of associated columns is the number of categories minus 1.
+        :param str save_root: Dir to make saves
+        :param str save_name: Name to use for saving checkpoints
+        :param int epochs: Epochs for `.fit()`
+        :param str dense_activation: Activation of internal layers, most likely 'relu,' 'sigmoid', 'leaky_relu', etc
+        :param float|int first_layer_width: Size of first layer after input. If an integer, it uses that value. If a float, it's a multiplier of the input size.
+        :param int layers: Number of internal layers
+        :param float layer_shrink_factor: With multiple internal layers, the width of each is this multiplied by the previous layer's width
+        :param float learning_rate: Learning rate for `.fit()`; common values are 0.01, 0.005, 0.001, 0.0005, 0.0001
+        :param int verbose: How much to print out, for mostly for debugging.
+        :returns: Array of importances, with length equal to twice the width of `X`
+        :rtype: np.ndarray
+        
+        Creates a SuperBasicNetwork and uses it for MALD Importance. See :doc:`importance` and :doc:`superBasicNetworks`
     """
     from . import superBasicNetworks
     from . import importance
@@ -79,7 +98,26 @@ def wStats(
     verbose: int = 0
     ) -> np.ndarray:
     """
-        W statistics from a SuperBasicNetwork.SimpleNN local grad importance
+        :param np.ndarray|pd.DataFrame X: Explanatory data
+        :param np.ndarray|pd.DataFrame Xk: Knockoff explanatory data
+        :param np.ndarray|pd.Series y: Outcome data
+        :param Literal['auto_diff','bandwidth'] local_grad_method: Method of MALD. Defaults to `'auto_diff'` for exact autodifferentiation. `'bandwidth'` uses the bandwidth approximation when auto differentiation is not available.
+        :param float|None bandwidth: Width if `local_grad_method = 'bandwidth'`
+        :param float exponent: Power to take of each MALD value. 1.0 and 2.0 both work reasonably well.
+        :param bool drop_first: How to handle one-hot-encoding categorical variables. If `True` the number of associated columns is the number of categories minus 1.
+        :param str save_root: Dir to make saves
+        :param str save_name: Name to use for saving checkpoints
+        :param int epochs: Epochs for `.fit()`
+        :param str dense_activation: Activation of internal layers, most likely 'relu,' 'sigmoid', 'leaky_relu', etc
+        :param float|int first_layer_width: Size of first layer after input. If an integer, it uses that value. If a float, it's a multiplier of the input size.
+        :param int layers: Number of internal layers
+        :param float layer_shrink_factor: With multiple internal layers, the width of each is this multiplied by the previous layer's width
+        :param float learning_rate: Learning rate for `.fit()`; common values are 0.01, 0.005, 0.001, 0.0005, 0.0001
+        :param int verbose: How much to print out, for mostly for debugging.
+        :returns: W statistics, half the length of `importances`, the same length as the original number of variables
+        :rtype: np.ndarray
+        
+        Creates a SuperBasicNetwork and uses it for MALD Importance, giving W stats. Equivalent to running `importances` followed by ``maldImportance.importance.wFromImportances()``. See :doc:`importance` and :doc:`superBasicNetworks`
     """
     from . import importance
     _importances: np.ndarray = importances(
@@ -106,4 +144,4 @@ def wStats(
         W_method = W_method,
         verbose = verbose
     )
-#/def
+#/def wStats

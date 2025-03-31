@@ -1,3 +1,9 @@
+"""
+    Interface to calculate the MALD Importance and W Statistics given a `PredictionModel`, either your own or created through ``maldImportance.superBasicNetworks``; see :doc:`superBasicNetworks`.
+    
+    If you do wish to use a ``maldImportance.superBasicNetworks.SimpleNN`` then you can use the ``maldImportance.nnImportance`` (:doc:`nnImportance`) module for simplicity.
+"""
+
 import pandas as pd
 import numpy as np
 
@@ -5,19 +11,38 @@ from typing import Callable, Literal, Protocol, Self
 from abc import abstractmethod
 
 class PredictionModel( Protocol ):
+    """
+        Interface for prediction models, including ``hexathello.superBasicNetworks.SimpleNN``, as well as most tensorflow keras network predictors.
+    """
     @abstractmethod
-    def fit( self: Self, X: np.ndarray, y: np.ndarray, **kwargs ) -> Self:
-        ...
+    def fit( self: Self, X, y, **kwargs ) -> Self:
+        """
+            :param X: Explanatory data, likely concatenated with knockoffs
+            :param y: Outcome data
+            :param kwargs: Other arguments
+        """
+        raise NotImplementedError()
     #
     
     @abstractmethod
-    def predict( self: Self, X: np.ndarray ) -> np.ndarray:
-        ...
+    def predict( self: Self, X ) -> np.ndarray:
+        """
+            :param X: Explanatory data, likely concatenated with knockoffs
+            :returns: Predictions, one for each row of `X`
+            :rtype: np.ndarray
+        """
+        raise NotImplementedError()
     #
     
     @abstractmethod
     def call( self: Self, X ):
-        ...
+        """
+            :param X: Explanatory data, likely concatenated with knockoffs
+            :returns: A prediction result
+            
+            Used for auto differentiation
+        """
+        raise NotImplementedError()
     #
 #/class PredictionModel( Protocol )
 
@@ -25,6 +50,14 @@ def auto_diff(
     model: PredictionModel,
     X: np.ndarray
     ) -> np.ndarray:
+    """
+        :param PredictionModel model: Predictor which can use autodifferentiation
+        :param np.ndarray X: Explanatory data, likely including the knockoffs
+        :returns: Array of partial derivatives for each variable at each data point. Same dimensions as `X`
+        :rtype: np.ndarray
+        
+        Uses the auto differentiating capabilities of our `model` to get the exact MALD values.
+    """
     import tensorflow as tf
     
     _X = tf.constant( X )
@@ -111,20 +144,21 @@ def importancesFromModel(
     verbose: int = 0
     ) -> np.ndarray:
     """
-        Takes an initialized PredictionModel, fits it, and gets the local gradient importance
+        :param PredictionModel model: Predictor which can use autodifferentiation
+        :param np.ndarray|pd.DataFrame X: Explanatory data
+        :param np.ndarray|pd.DataFrame Xk: Knockoff explanatory data
+        :param np.ndarray|pd.Series y: Outcome data
+        :param Literal['auto_diff','bandwidth'] local_grad_method: Method of MALD. Defaults to `'auto_diff'` for exact autodifferentiation. `'bandwidth'` uses the bandwidth approximation when auto differentiation is not available.
+        :param bool fit: Whether to fit `model`. Set to `False` if you have already trained it to your satisfaction on the combined explanatory and knockoff data together.
+        :param float|None bandwidth: Width if `local_grad_method = 'bandwidth'`
+        :param float exponent: Power to take of each MALD value. 1.0 and 2.0 both work reasonably well.
+        :param bool drop_first: How to handle one-hot-encoding categorical variables. If `True` the number of associated columns is the number of categories minus 1.
+        :param int verbose: How much to print out, for mostly for debugging.
+        :returns: Array of importances, with length equal to twice the width of `X`
+        :rtype: np.ndarray
         
-        X: data
-        Xk: knockoff data
-        y: outcome data
-        local_grad_method: Whether to use autodifferentiation or a bandwidth method
-        bandwidth: amount to perturb X[j] and Xk[j], defaulting to (n**(-0.2)), where
-            n is sample size, or X.shape[0]
-            Used only when `local_grad_method == 'bandwidth'`
-        exponent: Power to take of the absolute value of local gradients
-        drop_first: Passes to `pd.get_dummies` when categorical variables are present. Likely should be true unless `model` can handle the perfect colinearity (neural networks for example).
-        **kwargs: passed to `model.fit`
+        Takes an initialized PredictionModel, likely fits it, and gets the MALD importances for each `X` and `Xk` variable
         
-        returns W stats, from the absolute difference
     """
     assert X.shape == Xk.shape
     
@@ -311,14 +345,6 @@ def importancesFromModel(
         np.abs( localGrad_matrix )**exponent,
         axis = 0
     )
-    # TEST: 2025-02-15
-    if True:
-        print( localGrad_matrix )
-        print( localGrad_matrix.shape )
-        print( importances )
-        print( importances.shape )
-        raise Exception("Check importances")
-    #
     
     # Fix the shit: throw an error if it's a zero matrix
     if np.allclose(
@@ -335,6 +361,15 @@ def wFromImportances(
     W_method: Literal['difference','signed_max'] = 'difference',
     verbose: int = 0
     ) -> np.ndarray:
+    """
+        :param np.ndarray importances: Importance measures, likely from ``importancesFromModel()``
+        :param Literal['difference','signed_max'] W_method: How to calculate W statistics from importance measures, given the two most common methods.
+        :param int verbose: How much to print out, for mostly for debugging.
+        :returns: W statistics, half the length of `importances`, the same length as the original number of variables
+        :rtype: np.ndarray
+        
+        Converts arbitrary importances to W statistics for the knockoff procedure.
+    """
     p: int = len( importances ) // 2
     W_out: np.ndarray
     if W_method == 'difference':
@@ -351,7 +386,7 @@ def wFromImportances(
             #/switch importances[ j ] - importances[ j+p ]
         #/for j in range(p)
     else:
-        raise Exception("Unrecognized W_method={}".format(W_method))
+        raise ValueError("Unrecognized W_method={}".format(W_method))
     #
     return W_out
 #/def wFromImportances
@@ -364,12 +399,28 @@ def wFromModel(
     W_method: Literal['difference','signed_max'] = 'difference',
     local_grad_method: Literal['auto_diff','bandwidth'] = 'auto_diff',
     fit: bool = True,
-    exponent: float = 2.0,
     bandwidth: float | None = None,
+    exponent: float = 2.0,
     drop_first: bool = True,
     verbose: int = 0
     ) -> np.ndarray:
-    
+    """
+        :param PredictionModel model: Predictor which can use autodifferentiation
+        :param np.ndarray|pd.DataFrame X: Explanatory data
+        :param np.ndarray|pd.DataFrame Xk: Knockoff explanatory data
+        :param np.ndarray|pd.Series y: Outcome data
+        :param Literal['difference','signed_max'] W_method: How to calculate W statistics from importance measures, given the two most common methods.
+        :param Literal['auto_diff','bandwidth'] local_grad_method: Method of MALD. Defaults to `'auto_diff'` for exact autodifferentiation. `'bandwidth'` uses the bandwidth approximation when auto differentiation is not available.
+        :param bool fit: Whether to fit `model`. Set to `False` if you have already trained it to your satisfaction on the combined explanatory and knockoff data together.
+        :param float|None bandwidth: Width if `local_grad_method = 'bandwidth'`
+        :param float exponent: Power to take of each MALD value. 1.0 and 2.0 both work reasonably well.
+        :param bool drop_first: How to handle one-hot-encoding categorical variables. If `True` the number of associated columns is the number of categories minus 1.
+        :param int verbose: How much to print out, for mostly for debugging.
+        :returns: W statistics, half the length of `importances`, the same length as the original number of variables
+        :rtype: np.ndarray
+        
+        A one step method of getting W statistics given a `PredictionModel`, wrapping ``importancesFromModel()`` and ``wFromImportances()``
+    """
     importances: np.ndarray = importancesFromModel(
         model = model,
         X = X,

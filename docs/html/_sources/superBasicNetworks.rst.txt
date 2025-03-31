@@ -1,0 +1,5 @@
+.. automodule:: maldImportance.superBasicNetworks
+    :members: get_SimpleNN, fit_SimpleNN
+    
+.. autoclass:: maldImportance.superBasicNetworks.SimpleNN
+    :members: getNetwork, fit, predict, call

@@ -1,0 +1,2 @@
+.. automodule:: maldImportance.nnImportance
+    :members: importances, wStats

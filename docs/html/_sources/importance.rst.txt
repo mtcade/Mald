@@ -1,0 +1,5 @@
+.. automodule:: maldImportance.importance
+    :members: auto_diff, importancesFromModel, wFromImportances, wFromModel
+    
+.. autoclass:: maldImportance.importance.PredictionModel
+    

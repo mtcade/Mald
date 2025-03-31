@@ -1,7 +1,7 @@
 """
-    Interface for using neural networks for outcome variables, NOT for making knockoffs. We can save the networks, do hyperparameter search, and then train networks with given set of hyperparameters.
+    Interface for creating simple Keras neural networks for outcome variables, and calculating the Mean Absolute Local Derivatives (MALD)
     
-    The basic architecture is a few dense layers, either shrinking in layer size or staying the same.
+    If you have your own preferred networks or other predictors, you can skip using this module.
 """
 import tensorflow as tf
 import pandas as pd
@@ -10,6 +10,25 @@ import numpy as np
 from typing import Literal, Self
 
 class SimpleNN():
+    """
+        :param str save_root: Dir to make saves
+        :param str save_name: Name to use for saving checkpoints
+        :param int epochs: Epochs for `.fit()`
+        :param str dense_activation: Activation of internal layers, most likely 'relu,' 'sigmoid', 'leaky_relu', etc
+        :param float|int first_layer_width: Size of first layer after input. If an integer, it uses that value. If a float, it's a multiplier of the input size.
+        :param int layers: Number of internal layers
+        :param float layer_shrink_factor: With multiple internal layers, the width of each is this multiplied by the previous layer's width
+        :param float learning_rate: Learning rate for `.fit()`; common values are 0.01, 0.005, 0.001, 0.0005, 0.0001
+        :param int verbose: How much to print out, for mostly for debugging.
+        
+        See `https://keras.io/api/models/ <https://keras.io/api/models/>`_
+        
+        Easy interface for dense, simply connected Neural Networks, a good starting point for estimation of single continuous outcomes of i.i.d. explanatory data. The key is that this class conforms to the `PredictionModel` Protocol, used by other modules, by including:
+            
+            * `.fit()`
+            * `.predict()`
+            * `.call()`
+    """
     def __init__(
         self: Self,
         save_root: str,
@@ -22,10 +41,7 @@ class SimpleNN():
         layer_shrink_factor: float,
         learning_rate: float,
         verbose: int = 0
-        ) -> Self:
-        """
-            Sets parameters
-        """
+        ) -> None:
         self.save_root = save_root
         self.save_name = save_name
         self.epochs = epochs
@@ -56,17 +72,17 @@ class SimpleNN():
         hyperparameters: dict[ str, any ]
         ) -> tf.keras.Model:
         """
-            Builds a network with architecture from hyperparameters
+            :param int input_length: Dimension of explanatory input data
+            :param dict[ str, any ] hyperparamters: Network architecture and training hyperparamters.
             
-            hyperparameters:
-                layers: int
-                    Number of dense layers
-                first_layer_width: int | float
-                    if int, layer width. If float, a multiplier of input_length
-                layer_shrink_factor: float
-                    Multiplier for layer width
-                learning_rate: float
                 
+            
+            Builds a network with architecture from hyperparameters (see `get_simpleNN()`)
+            
+                * `layers int`: Number of dense layers
+                * `first_layer_width int|float`: if int, layer width. If float, a multiplier of input_length
+                * `layer_shrink_factor float`: Multiplier for layer width
+                * `learning_rate float`
         """
         if self.verbose > 1:
             print("# Building SimpleNN network with hyper parameters:")
@@ -148,11 +164,19 @@ class SimpleNN():
         self: Self,
         X: np.ndarray,
         y: np.ndarray
-        ) -> Self:
-        self.network = self.getNetwork(
-            input_length = X.shape[1],
-            hyperparameters = self.hyperparameters
-        )
+        ) -> None:
+        """
+            :param np.ndarray X: Explanatory data, likely including the knockoffs
+            :param np.ndarray y: Outcome data
+            
+            Initializes the `.network` if necessary and calls `.fit` on it
+        """
+        if self.network is None:
+            self.network = self.getNetwork(
+                input_length = X.shape[1],
+                hyperparameters = self.hyperparameters
+            )
+        #/def if self.network is None
         
         self.network.fit(
             x = X,
@@ -163,12 +187,24 @@ class SimpleNN():
     #
     
     def predict( self: Self, X: np.ndarray ) -> np.ndarray:
+        """
+            :param np.ndarray X: Explanatory data, likely including the knockoffs
+            :returns: Predictions from the trained network
+            :rtype: np.ndarray
+            
+            Calls `self.network.predict( X )`
+        """
         return self.network.predict(
             X
         ).reshape( (X.shape[0],) )
     #
     
     def call( self: Self, X: np.ndarray | tf.Tensor ) -> np.ndarray | tf.Tensor:
+        """
+            :param np.ndarray|tf.Tensor X: Explanatory data, likely including the knockoffs
+            :returns: Prediction result from `self.network.call(X)`
+            :rtype: np.ndarray|tf.Tensor
+        """
         return self.network.call( X )
     #
 #/class SimpleNN
@@ -186,7 +222,17 @@ def get_SimpleNN(
     verbose: int = 0
     ) -> SimpleNN:
     """
-        Applies defaults for SimpleNN, while allowing other values
+        :param str save_root: Dir to make saves
+        :param str save_name: Name to use for saving checkpoints
+        :param int epochs: Epochs for `.fit()`
+        :param str dense_activation: Activation of internal layers, most likely 'relu,' 'sigmoid', 'leaky_relu', etc
+        :param float|int first_layer_width: Size of first layer after input. If an integer, it uses that value. If a float, it's a multiplier of the input size.
+        :param int layers: Number of internal layers
+        :param float layer_shrink_factor: With multiple internal layers, the width of each is this multiplied by the previous layer's width
+        :param float learning_rate: Learning rate for `.fit()`; common values are 0.01, 0.005, 0.001, 0.0005, 0.0001
+        :param int verbose: How much to print out, for mostly for debugging.
+        
+        Constructor for ``SimpleNN``, setting defaults
     """
     return SimpleNN(
         save_root = save_root,
@@ -218,7 +264,21 @@ def fit_SimpleNN(
     verbose: int = 0
     ) -> SimpleNN:
     """
-        Initialize and run fit with SimpleNN
+        :param np.ndarray|pd.DataFrame X: Explanatory data
+        :param np.ndarray|pd.DataFrame Xk: Knockoff data, of the same dimension as `X`
+        :param np.ndarray|pd.Series y: Outcome data
+        :param bool drop_first: How to handle one-hot-encoding categorical variables. If `True` the number of associated columns is the number of categories minus 1.
+        :param str save_root: Dir to make saves
+        :param str save_name: Name to use for saving checkpoints
+        :param int epochs: Epochs for `.fit()`
+        :param str dense_activation: Activation of internal layers, most likely 'relu,' 'sigmoid', 'leaky_relu', etc
+        :param float|int first_layer_width: Size of first layer after input. If an integer, it uses that value. If a float, it's a multiplier of the input size.
+        :param int layers: Number of internal layers
+        :param float layer_shrink_factor: With multiple internal layers, the width of each is this multiplied by the previous layer's width
+        :param float learning_rate: Learning rate for `.fit()`; common values are 0.01, 0.005, 0.001, 0.0005, 0.0001
+        :param int verbose: How much to print out, for mostly for debugging.
+        
+        Initializing and fits a ``SimpleNN`` with defaults.
     """
     
     model: SimpleNN = get_SimpleNN(
