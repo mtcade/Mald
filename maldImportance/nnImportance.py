@@ -52,7 +52,7 @@ def importances(
     from . import superBasicNetworks
     from . import importance
     
-    network = SuperBasicNetworks.SimpleNN(
+    network = superBasicNetworks.SimpleNN(
         save_root = save_root,
         save_name = save_name,
         epochs = epochs,
@@ -64,7 +64,7 @@ def importances(
         verbose = verbose
     )
     
-    return Importance.importancesFromModel(
+    return importance.importancesFromModel(
         model = network,
         X = X,
         Xk = Xk,
@@ -139,7 +139,7 @@ def wStats(
         verbose = verbose
     )
     
-    return Importance.wFromImportances(
+    return importance.wFromImportances(
         importances = _importances,
         W_method = W_method,
         verbose = verbose

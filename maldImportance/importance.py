@@ -184,12 +184,12 @@ def importancesFromModel(
                 drop_first = drop_first
             ).to_numpy( dtype = float )
             
-            oheDict_X = Utilities.get_oheDict(
+            oheDict_X = utilities.get_oheDict(
                 X = X,
                 drop_first = drop_first,
                 starting_index = 0
             )
-            oheDict_Xk = Utilities.get_oheDict(
+            oheDict_Xk = utilities.get_oheDict(
                 X = Xk,
                 drop_first = drop_first,
                 starting_index = X.shape[1],
@@ -217,12 +217,13 @@ def importancesFromModel(
     )
     
     _y: np.ndarray
-    if isinstance( y, pd.Series ):
+    if isinstance( y, pd.Series | pd.DataFrame ):
         _y = y.to_numpy()
     #
     else:
         _y = y
     #/if isinstance( y, pd.Series )/else
+    _y = np.reshape( _y, ( X_concat.shape[0], ) )
     
     # Fit if necessary; we can have a model already trained
     #   by setting to False
@@ -239,22 +240,20 @@ def importancesFromModel(
             X_concat
         )
         y_hat = None
-        
-        # TEST 2025-02-15
-        print("# auto_diff_matrix")
-        print( auto_diff_matrix)
     #
     elif local_grad_method == 'bandwidth':
         auto_diff_matrix = None
         y_hat = model.predict( X_concat )
         
-        # TEST 2025-02-15
-        print( _y )
-        print( y_hat )
-        
-        _y_diff = y_hat - _y
-        print( "_y_diff: {} ({})".format(np.mean(_y_diff),np.std(_y_diff)))
-        raise Exception("_y_diff")
+        if False:
+            # TEST 2025-02-15
+            print( _y )
+            print( y_hat )
+            
+            _y_diff = y_hat - _y
+            print( "_y_diff: {} ({})".format(np.mean(_y_diff),np.std(_y_diff)))
+            raise Exception("_y_diff")
+        #
         
         if bandwidth is None:
             bandwidth = X_concat.shape[0]**(-0.2)
@@ -300,8 +299,8 @@ def importancesFromModel(
                 # numeric
                 if local_grad_method == 'auto_diff':
                     column_grad = auto_diff_matrix[:, oheDict[j] ]
-                    print("grad {}".format(j))
-                    print( column_grad )
+                    #print("grad {}".format(j))
+                    #print( column_grad )
                     localGrad_matrix[:,j] = column_grad
                 #
                 elif local_grad_method == 'bandwidth':
@@ -327,17 +326,9 @@ def importancesFromModel(
                     model = model,
                     drop_first = drop_first
                 )
-                print("category {}".format(j))
-                print( column_grad )
                 localGrad_matrix[:,j] = column_grad
             #/if isinstance( oheDict[j], int )/else
-            if isinstance( oheDict[j], int ):
-                print("# Column {} (numeric)".format(j,))
-            #
-            else:
-                print("# Column {} (categorical)".format(j,))
-            #
-            print( localGrad_matrix[ :, j ] )
+            #print( localGrad_matrix[ :, j ] )
         #/for j in range( p_out )
     #/if oheDict == {}/else
     
